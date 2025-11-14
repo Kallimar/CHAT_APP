@@ -33,6 +33,7 @@ const LeftSidebar = () => {
 
   const [user, setUser] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const inputHandler = async (e) => {
     const input = e.target.value;
@@ -43,15 +44,13 @@ const LeftSidebar = () => {
 
     try {
       setShowSearch(true);
-
-      const userRef = collection(db, "users");
-      const q = query(userRef, where("username", "==", input.toLowerCase()));
-      const snap = await getDocs(q);
+      const snap = await getDocs(
+        query(collection(db, "users"), where("username", "==", input.toLowerCase()))
+      );
 
       if (!snap.empty && snap.docs[0].data().id !== userData.id) {
         const data = snap.docs[0].data();
         const exists = chatData?.some((c) => c.rId === data.id);
-
         setUser(exists ? null : data);
       } else {
         setUser(null);
@@ -61,18 +60,15 @@ const LeftSidebar = () => {
     }
   };
 
-  // Create a new chat between two users
   const addChat = async () => {
     try {
       const msgRef = doc(collection(db, "messages"));
 
-      // Create messages document
       await setDoc(msgRef, {
         createdAt: serverTimestamp(),
         messages: [],
       });
 
-      // Create chat in both users
       const chatEntry1 = {
         messageId: msgRef.id,
         lastMessage: "",
@@ -98,10 +94,7 @@ const LeftSidebar = () => {
       });
 
       setMessagesId(msgRef.id);
-      setChatUser({
-        ...chatEntry1,
-        userData: user,
-      });
+      setChatUser({ ...chatEntry1, userData: user });
       setChatVisible(true);
       setShowSearch(false);
     } catch (err) {
@@ -110,10 +103,8 @@ const LeftSidebar = () => {
     }
   };
 
-  // Open chat
   const setChat = async (item) => {
     try {
-      // 1. Ensure messages document exists
       const msgDoc = doc(db, "messages", item.messageId);
       const msgSnap = await getDoc(msgDoc);
 
@@ -121,7 +112,6 @@ const LeftSidebar = () => {
         await setDoc(msgDoc, { createdAt: Date.now(), messages: [] });
       }
 
-      // 2. Set UI state
       setMessagesId(item.messageId);
       setChatUser(item);
       setChatVisible(true);
@@ -136,8 +126,19 @@ const LeftSidebar = () => {
       <div className="ls-top">
         <div className="ls-nav">
           <img src={assets.logo} className="logo" alt="" />
+
+          {/* 🔥 SUBMENU RESTORED HERE */}
           <div className="menu">
-            <img src={assets.menu_icon} alt="" onClick={() => navigate("/profile")} />
+            <img
+              src={assets.menu_icon}
+              alt="menu"
+              onClick={() => setMenuOpen((prev) => !prev)}
+            />
+            <div className={`sub-menu ${menuOpen ? "active" : ""}`}>
+              <p onClick={() => navigate("/profile")}>Edit Profile</p>
+              <hr />
+              <p onClick={()=>logout()}>Logout</p>
+            </div>
           </div>
         </div>
 
