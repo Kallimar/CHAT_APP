@@ -80,7 +80,6 @@ const ChatBox = () => {
           }
         })
       }
-      console.log(sendMessage)
     } catch (error) {
       toast.error(error.message)
     }

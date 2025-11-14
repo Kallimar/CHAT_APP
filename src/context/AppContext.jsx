@@ -14,28 +14,19 @@ const AppContextProvider = (props) => {
   const [chatUser, setChatUser] = useState(null);
   const [chatVisible, setChatVisible] = useState(false);
 
+  // Load user profile from Firestore
   const loadUserData = async (uid) => {
     try {
       const userRef = doc(db, "users", uid);
       const userSnap = await getDoc(userRef);
-      const userData = userSnap.data();
-      setUserData(userData);
 
-      // ✅ FIX: Create chats/{uid} if missing
-      const chatsRef = doc(db, "chats", uid);
-      const chatsSnap = await getDoc(chatsRef);
+      if (!userSnap.exists()) return;
 
-      if (!chatsSnap.exists()) {
-        await setDoc(chatsRef, { chatsData: [] });
-        console.log("Created chats document for new user:", uid);
-      }
+      const uData = userSnap.data();
+      setUserData(uData);
 
-      // Redirect user
-      if (userData.avatar && userData.name) {
-        navigate("/chat");
-      } else {
-        navigate("/profile");
-      }
+      if (uData.avatar && uData.name) navigate("/chat");
+      else navigate("/profile");
 
       // Update lastSeen
       await updateDoc(userRef, { lastSeen: Date.now() });
@@ -45,35 +36,34 @@ const AppContextProvider = (props) => {
           await updateDoc(userRef, { lastSeen: Date.now() });
         }
       }, 60000);
-    } catch (error) {
-      console.error("loadUserData error:", error);
+    } catch (err) {
+      console.log(err);
     }
   };
 
+  // Listen for chats list
   useEffect(() => {
-    if (userData) {
-      const chatRef = doc(db, "chats", userData.id);
+    if (!userData) return;
 
-      const unSub = onSnapshot(chatRef, async (res) => {
-        if (!res.exists()) return; // prevent crash for new users
+    const chatRef = doc(db, "chats", userData.id);
+    const unSub = onSnapshot(chatRef, async (res) => {
+      const data = res.data();
+      if (!data || !Array.isArray(data.chatsData)) {
+        setChatData([]);
+        return;
+      }
 
-        const chatItems = res.data().chatsData || [];
-        const tempData = [];
+      const temp = [];
+      for (const item of data.chatsData) {
+        const userRef = doc(db, "users", item.rId);
+        const userSnap = await getDoc(userRef);
+        temp.push({ ...item, userData: userSnap.data() });
+      }
 
-        for (const item of chatItems) {
-          const userRef = doc(db, "users", item.rId);
-          const userSnap = await getDoc(userRef);
-          const userData = userSnap.data();
-          tempData.push({ ...item, userData });
-        }
+      setChatData(temp.sort((a, b) => b.updatedAt - a.updatedAt));
+    });
 
-        tempData.sort((a, b) => b.updatedAt - a.updatedAt);
-
-        setChatData(tempData);
-      });
-
-      return () => unSub();
-    }
+    return () => unSub();
   }, [userData]);
 
   const value = {
@@ -83,7 +73,7 @@ const AppContextProvider = (props) => {
     messages, setMessages,
     messagesId, setMessagesId,
     chatUser, setChatUser,
-    chatVisible, setChatVisible,
+    chatVisible, setChatVisible
   };
 
   return (
