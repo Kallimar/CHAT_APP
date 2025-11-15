@@ -67,67 +67,161 @@ const LeftSidebar = () => {
     }
   };
 
-  const addChat = async () => {
-    try {
-      const msgRef = doc(collection(db, "messages"));
+  // const addChat = async () => {
+  //   try {
+  //     const msgRef = doc(collection(db, "messages"));
 
-      await setDoc(msgRef, {
-        createdAt: serverTimestamp(),
-        messages: [],
-      });
+  //     await setDoc(msgRef, {
+  //       createdAt: serverTimestamp(),
+  //       messages: [],
+  //     });
 
-      const chatEntry1 = {
-        messageId: msgRef.id,
-        lastMessage: "",
-        rId: user.id,
-        updatedAt: Date.now(),
-        messageSeen: true,
-      };
+  //     const chatEntry1 = {
+  //       messageId: msgRef.id,
+  //       lastMessage: "",
+  //       rId: user.id,
+  //       updatedAt: Date.now(),
+  //       messageSeen: true,
+  //     };
 
-      const chatEntry2 = {
-        messageId: msgRef.id,
-        lastMessage: "",
-        rId: myId,
-        updatedAt: Date.now(),
-        messageSeen: true,
-      };
+  //     const chatEntry2 = {
+  //       messageId: msgRef.id,
+  //       lastMessage: "",
+  //       rId: myId,
+  //       updatedAt: Date.now(),
+  //       messageSeen: true,
+  //     };
 
-      // 🔥 Use myId, not userData.id
-      await updateDoc(doc(db, "chats", myId), {
-        chatsData: arrayUnion(chatEntry1),
-      });
+  //     // 🔥 Use myId, not userData.id
+  //     await updateDoc(doc(db, "chats", myId), {
+  //       chatsData: arrayUnion(chatEntry1),
+  //     });
 
-      await updateDoc(doc(db, "chats", user.id), {
-        chatsData: arrayUnion(chatEntry2),
-      });
+  //     await updateDoc(doc(db, "chats", user.id), {
+  //       chatsData: arrayUnion(chatEntry2),
+  //     });
 
-      setMessagesId(msgRef.id);
-      setChatUser({ ...chatEntry1, userData: user });
-      setChatVisible(true);
-      setShowSearch(false);
-    } catch (err) {
-      toast.error("Error creating chat");
-      console.log(err);
+  //     setMessagesId(msgRef.id);
+  //     setChatUser({ ...chatEntry1, userData: user });
+  //     setChatVisible(true);
+  //     setShowSearch(false);
+  //   } catch (err) {
+  //     toast.error("Error creating chat");
+  //     console.log(err);
+  //   }
+  // };
+const addChat = async () => {
+  try {
+    const msgRef = doc(collection(db, "messages"));
+
+    await setDoc(msgRef, {
+      createdAt: serverTimestamp(),
+      messages: [],
+    });
+
+    const chatEntry1 = {
+      messageId: msgRef.id,
+      lastMessage: "",
+      rId: user.id,
+      updatedAt: Date.now(),
+      messageSeen: true,
+    };
+
+    const chatEntry2 = {
+      messageId: msgRef.id,
+      lastMessage: "",
+      rId: myId,
+      updatedAt: Date.now(),
+      messageSeen: true,
+    };
+
+    // --- FIX ❗ Ensure MY chats doc exists ---
+    const myChatsRef = doc(db, "chats", myId);
+    const myChatsSnap = await getDoc(myChatsRef);
+    if (!myChatsSnap.exists()) {
+      await setDoc(myChatsRef, { chatsData: [] });
     }
-  };
 
-  const setChat = async (item) => {
-    try {
-      const msgDoc = doc(db, "messages", item.messageId);
-      const msgSnap = await getDoc(msgDoc);
+    // --- FIX ❗ Ensure OTHER USER’S chats doc exists ---
+    const rChatsRef = doc(db, "chats", user.id);
+    const rChatsSnap = await getDoc(rChatsRef);
+    if (!rChatsSnap.exists()) {
+      await setDoc(rChatsRef, { chatsData: [] });
+    }
 
-      if (!msgSnap.exists()) {
-        await setDoc(msgDoc, { createdAt: Date.now(), messages: [] });
+    // Now safe to update both
+    await updateDoc(myChatsRef, {
+      chatsData: arrayUnion(chatEntry1),
+    });
+
+    await updateDoc(rChatsRef, {
+      chatsData: arrayUnion(chatEntry2),
+    });
+
+    setMessagesId(msgRef.id);
+    setChatUser({ ...chatEntry1, userData: user });
+    setChatVisible(true);
+    setShowSearch(false);
+
+  } catch (err) {
+    toast.error("Error creating chat");
+    console.log(err);
+  }
+};
+
+  // const setChat = async (item) => {
+  //   try {
+  //     const msgDoc = doc(db, "messages", item.messageId);
+  //     const msgSnap = await getDoc(msgDoc);
+
+  //     if (!msgSnap.exists()) {
+  //       await setDoc(msgDoc, { createdAt: Date.now(), messages: [] });
+  //     }
+
+  //     setMessagesId(item.messageId);
+  //     setChatUser(item);
+  //     setChatVisible(true);
+  //   } catch (err) {
+  //     toast.error("Failed to open chat");
+  //     console.log(err);
+  //   }
+  // };
+const setChat = async (item) => {
+  try {
+    const msgDoc = doc(db, "messages", item.messageId);
+    const msgSnap = await getDoc(msgDoc);
+
+    if (!msgSnap.exists()) {
+      await setDoc(msgDoc, { createdAt: Date.now(), messages: [] });
+    }
+
+    // --- FIX: Mark chat as seen ---
+    const userChatsRef = doc(db, "chats", myId);
+    const userChatsSnap = await getDoc(userChatsRef);
+
+    if (userChatsSnap.exists()) {
+      const userChatData = userChatsSnap.data();
+      const chatIndex = userChatData.chatsData.findIndex(
+        (c) => c.messageId === item.messageId
+      );
+
+      if (chatIndex !== -1) {
+        userChatData.chatsData[chatIndex].messageSeen = true;
+
+        await updateDoc(userChatsRef, {
+          chatsData: userChatData.chatsData,
+        });
       }
-
-      setMessagesId(item.messageId);
-      setChatUser(item);
-      setChatVisible(true);
-    } catch (err) {
-      toast.error("Failed to open chat");
-      console.log(err);
     }
-  };
+
+    setMessagesId(item.messageId);
+    setChatUser(item);
+    setChatVisible(true);
+  } catch (err) {
+    toast.error("Failed to open chat");
+    console.log(err);
+  }
+};
 
   return (
     <div className={`ls ${chatVisible ? "hidden" : ""}`}>
