@@ -15,37 +15,73 @@ const AppContextProvider = (props) => {
   const [chatVisible, setChatVisible] = useState(false);
 
   // Load user profile from Firestore
-  const loadUserData = async (uid) => {
-    try {
-      const userRef = doc(db, "users", uid);
-      const userSnap = await getDoc(userRef);
+  // const loadUserData = async (uid) => {
+  //   try {
+  //     const userRef = doc(db, "users", uid);
+  //     const userSnap = await getDoc(userRef);
 
-      if (!userSnap.exists()) return;
+  //     if (!userSnap.exists()) return;
 
-      const uData = userSnap.data();
-      setUserData(uData);
+  //     const uData = userSnap.data();
+  //     setUserData(uData);
 
-      if (uData.avatar && uData.name) navigate("/chat");
-      else navigate("/profile");
+  //     if (uData.avatar && uData.name) navigate("/chat");
+  //     else navigate("/profile");
 
-      // Update lastSeen
-      await updateDoc(userRef, { lastSeen: Date.now() });
+  //     // Update lastSeen
+  //     await updateDoc(userRef, { lastSeen: Date.now() });
 
-      setInterval(async () => {
-        if (auth.currentUser) {
-          await updateDoc(userRef, { lastSeen: Date.now() });
-        }
-      }, 60000);
-    } catch (err) {
-      console.log(err);
+  //     setInterval(async () => {
+  //       if (auth.currentUser) {
+  //         await updateDoc(userRef, { lastSeen: Date.now() });
+  //       }
+  //     }, 60000);
+  //   } catch (err) {
+  //     console.log(err);
+  //   }
+  // };
+const loadUserData = async (uid) => {
+  try {
+    const userRef = doc(db, "users", uid);
+
+    let userSnap = await getDoc(userRef);
+
+    // 🔥 WAIT for the signup() to finish writing Firestore
+    let retries = 0;
+    while (!userSnap.exists() && retries < 10) {
+      await new Promise(res => setTimeout(res, 300));
+      userSnap = await getDoc(userRef);
+      retries++;
     }
-  };
+
+    // 🔥 If STILL no document → fail safely
+    if (!userSnap.exists()) {
+      console.log("User document NOT FOUND after signup.");
+      return;
+    }
+
+    const uData = { id: uid, ...userSnap.data() };
+    setUserData(uData);
+
+    if (uData.avatar && uData.name) navigate("/chat");
+    else navigate("/profile");
+
+    await updateDoc(userRef, { lastSeen: Date.now() });
+
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+
 
   // Listen for chats list
   useEffect(() => {
     if (!userData) return;
 
-    const chatRef = doc(db, "chats", userData.id);
+    // const chatRef = doc(db, "chats", userData.id);
+    const chatRef = doc(db, "chats", auth.currentUser.uid);
+
     const unSub = onSnapshot(chatRef, async (res) => {
       const data = res.data();
       if (!data || !Array.isArray(data.chatsData)) {
@@ -67,19 +103,23 @@ const AppContextProvider = (props) => {
   }, [userData]);
 
   const value = {
-    userData, setUserData,
-    chatData, setChatData,
+    userData,
+    setUserData,
+    chatData,
+    setChatData,
     loadUserData,
-    messages, setMessages,
-    messagesId, setMessagesId,
-    chatUser, setChatUser,
-    chatVisible, setChatVisible
+    messages,
+    setMessages,
+    messagesId,
+    setMessagesId,
+    chatUser,
+    setChatUser,
+    chatVisible,
+    setChatVisible,
   };
 
   return (
-    <AppContext.Provider value={value}>
-      {props.children}
-    </AppContext.Provider>
+    <AppContext.Provider value={value}>{props.children}</AppContext.Provider>
   );
 };
 

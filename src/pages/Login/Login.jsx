@@ -10,12 +10,12 @@ const Login = () => {
     const [email,setEmail] = useState("");
     const [password,setPassword] = useState("");
 
-    const onSubmitHandler = (event)=>{
+    const onSubmitHandler =async  (event)=>{
         event.preventDefault();
         if (currState === "Sign Up") {
-            signup(userName,email,password);
+           await signup(userName,email,password);
         } else {
-            login(email,password);
+           await login(email,password);
         }
     }
 

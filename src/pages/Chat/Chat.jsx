@@ -11,7 +11,7 @@ const Chat = () => {
   const [loading,setLoading] = useState(true)
 
   useEffect(()=>{
-    if (chatData && userData) {
+    if (userData && chatData !== undefined){
       setLoading(false)
     }
   },[chatData,userData])

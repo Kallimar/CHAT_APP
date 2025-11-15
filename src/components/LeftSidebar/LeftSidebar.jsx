@@ -15,7 +15,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "../../config/firebase";
+import { db, auth } from "../../config/firebase";
 import { AppContext } from "../../context/AppContext";
 import { toast } from "react-toastify";
 
@@ -26,10 +26,17 @@ const LeftSidebar = () => {
     chatData,
     setChatUser,
     setMessagesId,
-    messagesId,
     chatVisible,
     setChatVisible,
   } = useContext(AppContext);
+
+  // 🔥 Prevent rendering until userData is loaded
+  if (!userData || !userData.id) {
+    console.log("⏳ LeftSidebar waiting for userData...");
+    return null;
+  }
+
+  const myId = auth.currentUser.uid;   // 🔥 ALWAYS USE THIS
 
   const [user, setUser] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
@@ -48,7 +55,7 @@ const LeftSidebar = () => {
         query(collection(db, "users"), where("username", "==", input.toLowerCase()))
       );
 
-      if (!snap.empty && snap.docs[0].data().id !== userData.id) {
+      if (!snap.empty && snap.docs[0].data().id !== myId) {
         const data = snap.docs[0].data();
         const exists = chatData?.some((c) => c.rId === data.id);
         setUser(exists ? null : data);
@@ -80,12 +87,13 @@ const LeftSidebar = () => {
       const chatEntry2 = {
         messageId: msgRef.id,
         lastMessage: "",
-        rId: userData.id,
+        rId: myId,
         updatedAt: Date.now(),
         messageSeen: true,
       };
 
-      await updateDoc(doc(db, "chats", userData.id), {
+      // 🔥 Use myId, not userData.id
+      await updateDoc(doc(db, "chats", myId), {
         chatsData: arrayUnion(chatEntry1),
       });
 
@@ -127,7 +135,6 @@ const LeftSidebar = () => {
         <div className="ls-nav">
           <img src={assets.logo} className="logo" alt="" />
 
-          {/* 🔥 SUBMENU RESTORED HERE */}
           <div className="menu">
             <img
               src={assets.menu_icon}
@@ -137,7 +144,7 @@ const LeftSidebar = () => {
             <div className={`sub-menu ${menuOpen ? "active" : ""}`}>
               <p onClick={() => navigate("/profile")}>Edit Profile</p>
               <hr />
-              <p onClick={()=>logout()}>Logout</p>
+              <p onClick={() => logout()}>Logout</p>
             </div>
           </div>
         </div>
